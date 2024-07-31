@@ -22,5 +22,3 @@ This repository includes a dataset of head-only face images specifically curated
 - For detailed instructions on how to use the dataset, refer to the scripts included in this repository.
 
 ---
-
-Feel free to adjust the format and details as needed!
