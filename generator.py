@@ -1,54 +1,58 @@
-# generator.py
-import tensorflow as tf
-from tensorflow.keras.layers import Input, Reshape, Dropout, Dense
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Flatten, BatchNormalization
-from tensorflow.keras.layers import Reshape, Conv2DTranspose, Conv2D
-from tensorflow.keras.layers import LeakyReLU
-from tensorflow.keras.layers import Activation
-from tensorflow.keras.layers import Concatenate
-from tensorflow.keras.layers import UpSampling2D, Conv2D
+import torch
+import torch.nn as nn
 
-def build_generator(seed_size, channels):
-    # Build and return the generator model
-    model = Sequential()
+class build_generator(nn.Module):
+    def __init__(self, seed_size, channels):
+        super(build_generator, self).__init__()
 
-    # Start with a 5x5 size, which is easier to scale up to 160x160
-    model.add(Dense(5*5*256, activation="relu", input_dim=seed_size))
-    model.add(Reshape((5, 5, 256)))
+        self.model = nn.Sequential(
+            # Dense layer
+            nn.Linear(seed_size, 5 * 5 * 256),
+            nn.ReLU(inplace=True),
 
-    # Upsample to 10x10
-    model.add(UpSampling2D())
-    model.add(Conv2D(512, kernel_size=3, padding="same"))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(Activation("relu"))
+            # Reshape to 5x5x256
+            nn.Unflatten(1, (256, 5, 5)),
 
-    # Upsample to 20x20
-    model.add(UpSampling2D())
-    model.add(Conv2D(256, kernel_size=3, padding="same"))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(Activation("relu"))
+            # Upsample to 10x10
+            nn.Upsample(scale_factor=2, mode='nearest'),  # Use nearest neighbor upsampling
+            nn.Conv2d(256, 512, kernel_size=3, padding=1),
+            nn.BatchNorm2d(512, momentum=0.8),
+            nn.ReLU(inplace=True),
 
-    # Upsample to 40x40
-    model.add(UpSampling2D())
-    model.add(Conv2D(128, kernel_size=3, padding="same"))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(Activation("relu"))
+            # Upsample to 20x20
+            nn.Upsample(scale_factor=2, mode='nearest'),  # Use nearest neighbor upsampling
+            nn.Conv2d(512, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256, momentum=0.8),
+            nn.ReLU(inplace=True),
 
-    # Upsample to 80x80
-    model.add(UpSampling2D())
-    model.add(Conv2D(128, kernel_size=3, padding="same"))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(Activation("relu"))
+            # Upsample to 40x40
+            nn.Upsample(scale_factor=2, mode='nearest'),  # Use nearest neighbor upsampling
+            nn.Conv2d(256, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128, momentum=0.8),
+            nn.ReLU(inplace=True),
 
-    # Upsample to 160x160
-    model.add(UpSampling2D())
-    model.add(Conv2D(128, kernel_size=3, padding="same"))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(Activation("relu"))
+            # Upsample to 80x80
+            nn.Upsample(scale_factor=2, mode='nearest'),  # Use nearest neighbor upsampling
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128, momentum=0.8),
+            nn.ReLU(inplace=True),
 
-    # Final CNN layer
-    model.add(Conv2D(channels, kernel_size=3, padding="same"))
-    model.add(Activation("tanh"))
+            # Upsample to 160x160
+            nn.Upsample(scale_factor=2, mode='nearest'),  # Use nearest neighbor upsampling
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128, momentum=0.8),
+            nn.ReLU(inplace=True),
 
-    return model
+            # Final layer
+            nn.Conv2d(128, channels, kernel_size=3, padding=1),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+# Example usage
+# seed_size = 100
+# channels = 3
+# generator = Generator(seed_size=seed_size, channels=channels)
+# print(generator)
