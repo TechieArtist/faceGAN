@@ -139,19 +139,3 @@ def train(train_loader, epochs, generator, discriminator, criterion, optimizer_g
     plt.legend()
     plt.show()
 
-# Example usage:
-# Initialize the models, optimizers, and loss function
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-generator = build_generator(seed_size=SEED_SIZE, channels=3).to(device)
-discriminator = build_discriminator(image_shape=(160, 160, 3)).to(device)
-criterion = nn.BCEWithLogitsLoss()
-optimizer_g = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-optimizer_d = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-inception_model = inception_v3(pretrained=True, transform_input=False).to(device)
-
-# Load dataset and create data loader
-# train_dataset = ...
-# train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
-
-# Start training
-# train(train_loader, epochs=100, generator=generator, discriminator=discriminator, criterion=criterion, optimizer_g=optimizer_g, optimizer_d=optimizer_d, inception_model=inception_model)
