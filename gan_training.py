@@ -1,87 +1,136 @@
-import tensorflow as tf
-from tensorflow.keras.layers import Input, Reshape, Dropout, Dense
-from tensorflow.keras.layers import Flatten, BatchNormalization
-from tensorflow.keras.layers import Activation, ZeroPadding2D
-from tensorflow.keras.layers import LeakyReLU
-from tensorflow.keras.layers import UpSampling2D, Conv2D
-from tensorflow.keras.models import Sequential, Model, load_model
-from tensorflow.keras.optimizers import Adam 
+import torch
+import torch.optim as optim
 import numpy as np
+import time
+import torch.nn as nn
+import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm
-import os
-import time
-import matplotlib.pyplot as plt
-from PIL import Image, ImageOps
-from scipy.linalg import sqrtm
-from keras.applications.inception_v3 import InceptionV3, preprocess_input
-from keras.preprocessing.image import img_to_array
-from keras.datasets.mnist import load_data  # or your specific dataset
+from torchvision.utils import save_image
 from skimage.transform import resize
+from torchvision.models import inception_v3
+from torchvision.transforms import functional as F
+from torchvision import transforms
+from generator import build_generator
+from discriminator import build_discriminator
+from scipy.linalg import sqrtm
 
-def train(train_dataset, epochs):
+
+# Preview image
+PREVIEW_ROWS = 4
+PREVIEW_COLS = 7
+PREVIEW_MARGIN = 16
+
+# Size vector to generate images from
+SEED_SIZE = 100
+
+def hms_string(seconds):
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{int(hours)}:{int(minutes)}:{int(seconds)}"
+
+def calculate_fid(inception_model, real_images, generated_images):
+    # Process images for FID calculation
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize((299, 299)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    real_images = torch.stack([transform(img) for img in real_images])
+    generated_images = torch.stack([transform(img) for img in generated_images])
+    
+    inception_model.eval()
+    with torch.no_grad():
+        real_features = inception_model(real_images).cpu().numpy()
+        generated_features = inception_model(generated_images).cpu().numpy()
+
+    # Calculate FID score
+    mu1, sigma1 = real_features.mean(axis=0), np.cov(real_features, rowvar=False)
+    mu2, sigma2 = generated_features.mean(axis=0), np.cov(generated_features, rowvar=False)
+    ssdiff = np.sum((mu1 - mu2) ** 2)
+    covmean = sqrtm(sigma1.dot(sigma2))
+    fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean)
+    return fid
+
+def visualize_feature_maps_by_index(generator, layer_index, noise_vector):
+    # This function should visualize feature maps from a specific layer in the generator
+    pass
+
+def save_images(epoch, fixed_seed):
+    # Convert seed to tensor and generate images
+    fixed_seed = torch.tensor(fixed_seed, dtype=torch.float32)
+    with torch.no_grad():
+        generated_images = generator(fixed_seed).detach().cpu()
+    save_image(generated_images, f"generated_images_epoch_{epoch + 1}.png", nrow=10)
+
+def train(train_loader, epochs, generator, discriminator, criterion, optimizer_g, optimizer_d, inception_model):
     fixed_seed = np.random.normal(0, 1, (PREVIEW_ROWS * PREVIEW_COLS, SEED_SIZE))
     start = time.time()
 
     fid_scores = []
-
-    # Define the layer index for generator visualization
-    generator_layer_index = 5  # Change as needed
-
-    # Generate a noise vector for visualization
+    generator_layer_index = 5
     noise_vector_for_visualization = np.random.normal(0, 1, (SEED_SIZE,))
+    FID_INTERVAL = 10
+    VISUALIZATION_INTERVAL = 500
+    CHECKPOINT_PERIOD = 1000
 
-    FID_INTERVAL = 10  # Interval for calculating FID score
-    VISUALIZATION_INTERVAL = 500  # Interval for visualizing feature maps
-
-   # Select a subset of combined data for FID calculation
-    num_samples = 4000  # Adjust this number as needed
-    subset_indices = np.random.choice(len(combined_images), num_samples, replace=False)
-    training_subset = combined_images[subset_indices]
-
+    num_samples = 4000
+    combined_images = np.random.normal(0, 1, (num_samples, SEED_SIZE))  # Dummy data
 
     print("Initializing training...")
-    for epoch in range(start_epoch,epochs):
+    for epoch in range(epochs):
         print(f"Starting epoch {epoch+1}")
         epoch_start = time.time()
         gen_loss_list = []
         disc_loss_list = []
-        current_epoch.assign(epoch + 1)
 
+        for image_batch in tqdm(train_loader, desc=f'Epoch {epoch + 1}'):
+            image_batch = image_batch[0].to(device)  # Assuming image_batch is a tuple
 
-        for image_batch in train_dataset:
-            t = train_step(image_batch)
-            gen_loss_list.append(t[0].numpy())
-            disc_loss_list.append(t[1].numpy())
+            # Training Discriminator
+            optimizer_d.zero_grad()
+            noise = torch.randn(image_batch.size(0), SEED_SIZE, 1, 1, device=device)
+            fake_images = generator(noise)
+            real_output = discriminator(image_batch)
+            fake_output = discriminator(fake_images.detach())
+            disc_loss = (criterion(real_output, torch.ones_like(real_output)) +
+                         criterion(fake_output, torch.zeros_like(fake_output))) / 2
+            disc_loss.backward()
+            optimizer_d.step()
 
+            # Training Generator
+            optimizer_g.zero_grad()
+            fake_output = discriminator(fake_images)
+            gen_loss = criterion(fake_output, torch.ones_like(fake_output))
+            gen_loss.backward()
+            optimizer_g.step()
 
+            gen_loss_list.append(gen_loss.item())
+            disc_loss_list.append(disc_loss.item())
 
-        # Print the mean generator and discriminator loss for the epoch
         print(f'Epoch {epoch + 1}, gen loss={np.mean(gen_loss_list)}, disc loss={np.mean(disc_loss_list)}, {hms_string(time.time() - epoch_start)}')
 
-        # Calculate FID every FID_INTERVAL epochs
         if (epoch + 1) % FID_INTERVAL == 0:
-         noise = np.random.normal(0, 1, (num_samples, SEED_SIZE))
-         generated_images = generator.predict(noise)
-         fid = calculate_fid(inception_model, training_subset, generated_images)
-         print(f'Epoch {epoch + 1}, FID: {fid}')
-         fid_scores.append(fid)  # Append the FID score to the list
+            noise = torch.randn(num_samples, SEED_SIZE, 1, 1, device=device)
+            generated_images = generator(noise).detach().cpu()
+            fid = calculate_fid(inception_model, combined_images, generated_images)
+            print(f'Epoch {epoch + 1}, FID: {fid}')
+            fid_scores.append(fid)
 
-        # Visualize feature maps every VISUALIZATION_INTERVAL epochs
         if (epoch + 1) % VISUALIZATION_INTERVAL == 0:
-         visualize_feature_maps_by_index(generator, generator_layer_index, noise_vector_for_visualization)
-          # Save the model every CHECKPOINT_PERIOD epochs
+            visualize_feature_maps_by_index(generator, generator_layer_index, noise_vector_for_visualization)
+
         if (epoch + 1) % CHECKPOINT_PERIOD == 0:
-            save_path = checkpoint_manager.save()
-            print(f"Saved checkpoint for epoch {epoch + 1}: {save_path}")
+            torch.save(generator.state_dict(), f'generator_checkpoint_epoch_{epoch + 1}.pth')
+            torch.save(discriminator.state_dict(), f'discriminator_checkpoint_epoch_{epoch + 1}.pth')
+            print(f"Saved checkpoint for epoch {epoch + 1}")
 
-
-        # Save the generated images
         save_images(epoch, fixed_seed)
 
     print(f'Total Training time: {hms_string(time.time() - start)}')
 
-    # Plot the FID scores
     plt.figure(figsize=(10,5))
     plt.title("FID Scores over Epochs")
     plt.plot(fid_scores, label="FID Score")
@@ -89,3 +138,20 @@ def train(train_dataset, epochs):
     plt.ylabel("FID Score")
     plt.legend()
     plt.show()
+
+# Example usage:
+# Initialize the models, optimizers, and loss function
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+generator = build_generator(seed_size=SEED_SIZE, channels=3).to(device)
+discriminator = build_discriminator(image_shape=(160, 160, 3)).to(device)
+criterion = nn.BCEWithLogitsLoss()
+optimizer_g = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+optimizer_d = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+inception_model = inception_v3(pretrained=True, transform_input=False).to(device)
+
+# Load dataset and create data loader
+# train_dataset = ...
+# train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+# Start training
+# train(train_loader, epochs=100, generator=generator, discriminator=discriminator, criterion=criterion, optimizer_g=optimizer_g, optimizer_d=optimizer_d, inception_model=inception_model)
