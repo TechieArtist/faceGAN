@@ -9,7 +9,7 @@ This repository includes a dataset of head-only face images specifically curated
 
 - **Number of Images**: 40,000
 - **Image Dimensions**: 160x160 pixels
-- **Image Format**: [Specify format, e.g., JPEG, PNG]
+- **Image Format**: [JPEG, PNG]
 
 ### Usage
 
