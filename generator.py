@@ -51,8 +51,4 @@ class build_generator(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-# Example usage
-# seed_size = 100
-# channels = 3
-# generator = Generator(seed_size=seed_size, channels=channels)
 # print(generator)
