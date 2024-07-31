@@ -1,4 +1,3 @@
-Here’s a brief explanation for your README that includes the Hugging Face link:
 
 ---
 
