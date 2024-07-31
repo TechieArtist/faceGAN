@@ -14,7 +14,7 @@ from visualization_utils import visualize_feature_maps_by_index
 from torchvision.models import inception_v3, Inception_V3_Weights
 
 
-# Assuming build_generator and build_discriminator are defined similarly in PyTorch
+
 from generator import build_generator
 from discriminator import build_discriminator
 
