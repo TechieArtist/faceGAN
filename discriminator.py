@@ -24,7 +24,7 @@ class build_discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(0.25),
             nn.Flatten(),  # 512 * 11 * 11
-            nn.Linear(512 * 11 * 11, 1),  # 512*11*11 should match the expected input size
+            nn.Linear(512 * 11 * 11, 1), 
             nn.Sigmoid()
         )
 
