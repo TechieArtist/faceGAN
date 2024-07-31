@@ -51,4 +51,4 @@ class build_generator(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-# print(generator)
+
