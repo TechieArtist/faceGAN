@@ -11,9 +11,10 @@ from skimage.transform import resize
 from torchvision.models import inception_v3
 from torchvision.transforms import functional as F
 from torchvision import transforms
-from generator import build_generator
-from discriminator import build_discriminator
 from scipy.linalg import sqrtm
+from visualization_utils import visualize_feature_maps_by_index
+from Mainfile import generator, device
+
 
 
 # Preview image
@@ -87,7 +88,7 @@ def train(train_loader, epochs, generator, discriminator, criterion, optimizer_g
         disc_loss_list = []
 
         for image_batch in tqdm(train_loader, desc=f'Epoch {epoch + 1}'):
-            image_batch = image_batch[0].to(device)  # Assuming image_batch is a tuple
+            image_batch = image_batch[0].to(device)  
 
             # Training Discriminator
             optimizer_d.zero_grad()
@@ -138,4 +139,5 @@ def train(train_loader, epochs, generator, discriminator, criterion, optimizer_g
     plt.ylabel("FID Score")
     plt.legend()
     plt.show()
+
 
